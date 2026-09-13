@@ -243,7 +243,8 @@ services:
         condition: service_healthy
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    # pinned: PeerDB's ClickHouse connector and clickhouse/init/01_schema.sql were verified on this version
+    image: clickhouse/clickhouse-server:26.8.3.105
     env_file: .env
     ports:
       - "8123:8123"
@@ -252,7 +253,9 @@ services:
       - ./clickhouse/init:/docker-entrypoint-initdb.d
       - clickhouse_data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      # healthy only once clickhouse/init/01_schema.sql has created all 6 tables, so
+      # peerdb-init never races the schema and PeerDB always reuses our table definitions
+      test: ["CMD-SHELL", "clickhouse-client -u \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" -q \"SELECT throwIf(count() < 6) FROM system.tables WHERE database = 'ecommerce' AND name IN ('categories', 'products', 'customers', 'orders', 'order_items', 'payments')\""]
       interval: 5s
       timeout: 5s
       retries: 10
