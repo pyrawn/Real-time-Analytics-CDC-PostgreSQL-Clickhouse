@@ -87,19 +87,23 @@ erDiagram
 - `order_items.unit_price` is a **snapshot** of the product's price at purchase time —
   this is not a normalization violation, it's a fact that cannot be derived later
   (product price changes over time; the order must remember what was actually charged).
-- Every mutable table carries `updated_at`. This is required by Part 3: ClickHouse
-  will use `ReplacingMergeTree(updated_at)` to resolve out-of-order CDC updates, and
-  reads must use `FINAL` (or `ORDER BY updated_at DESC LIMIT 1 BY id`) to see the
-  latest version of a row.
+- Every mutable table carries `updated_at` (when the row last changed). In ClickHouse
+  (Part 3) the row version is PeerDB's own `_peerdb_version`: tables use
+  `ReplacingMergeTree(_peerdb_version)` ordered by the Postgres primary key, and reads
+  must use `FINAL` plus `WHERE _peerdb_is_deleted = 0` to see only the latest,
+  non-deleted version of a row. `updated_at` can't be the version: on DELETE Postgres
+  only sends the primary key, so the delete row arrives with `updated_at = 1970-01-01`
+  (and `categories` has no `updated_at`). Details and query examples:
+  [clickhouse/README.md](../clickhouse/README.md).
 - `order_status` transitions: `pending → paid → shipped → delivered`, or
   `pending → cancelled`. `payment_status`: `pending → completed`, or
   `pending → failed → refunded`. The generator drives these transitions via UPDATE.
 - DELETEs must actually happen (not just be simulated as status changes) so the CDC
   delete path gets exercised — e.g. deleting an `order_items` row before checkout, or
-  deleting a stale unpaid `payments` row. **How PeerDB propagates deletes into
-  ClickHouse (soft-delete column vs hard row delete) is not something to assume —
-  Part 2/3 owners must check the current PeerDB docs for this and document what they
-  found**, don't guess.
+  deleting a stale unpaid `payments` row. **Finding (Parts 2/3):** PeerDB propagates
+  deletes into ClickHouse as a soft delete — a new row version with
+  `_peerdb_is_deleted = 1` and the non-key columns empty. See
+  [peerdb/README.md](../peerdb/README.md) and [clickhouse/README.md](../clickhouse/README.md).
 
 ## 4. Architecture
 
