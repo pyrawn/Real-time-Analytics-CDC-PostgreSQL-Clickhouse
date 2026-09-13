@@ -259,6 +259,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      # first boot runs the init scripts on a temporary server before the real one starts;
+      # don't count failures during that window on slower machines
+      start_period: 60s
 
   # --- dashboard service goes here (Lorena) ---
 
