@@ -31,6 +31,11 @@ docker compose exec clickhouse sh -c 'clickhouse-client --password "$CLICKHOUSE_
 > el esquema, hay que recrear los volúmenes: `docker compose down -v && docker compose up --build`
 > (esto borra los datos locales de Postgres, PeerDB y ClickHouse; el generador y PeerDB los vuelven a llenar).
 
+> **Si ClickHouse se reinicia** con el pipeline corriendo, PeerDB registra errores de conexión
+> ("failed to ping", "unexpected EOF") y espera 1 minuto antes de reanudar; si se acumulan varios
+> errores seguidos, espera más (hasta 10 min). El mirror sigue activo, reanuda desde donde se quedó
+> y no se pierden datos.
+
 ## Decisiones de esquema
 
 ### Tipos: exactamente lo que escribe PeerDB
