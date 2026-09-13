@@ -27,12 +27,15 @@ services:
       timeout: 5s
       retries: 10
 
-  # generator:
-  #   build: ./generator
-  #   env_file: .env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
+  generator:
+    build: ./generator
+    env_file: .env
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # --- peerdb services go here (Valeria) ---
 
