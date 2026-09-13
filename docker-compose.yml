@@ -1,0 +1,58 @@
+# Shared compose file — see docs/handoffs.md Section 0 before editing.
+# Only add/edit the service block(s) that belong to your part.
+#
+#   postgres, generator      -> Julio      (docs/handoffs.md Section 1)
+#   peerdb-*                 -> Valeria    (docs/handoffs.md Section 2)
+#   clickhouse                -> Jose Angel (docs/handoffs.md Section 3)
+#   (benchmark runs on-demand, not a long-running service — Leonora)
+#   dashboard                 -> Lorena     (docs/handoffs.md Section 5)
+
+services:
+  postgres:
+    image: postgres:16
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # generator:
+  #   build: ./generator
+  #   env_file: .env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
+  # --- peerdb services go here (Valeria) ---
+
+  # clickhouse:
+  #   image: clickhouse/clickhouse-server:latest
+  #   env_file: .env
+  #   ports:
+  #     - "8123:8123"
+  #     - "9000:9000"
+  #   volumes:
+  #     - ./clickhouse/init:/docker-entrypoint-initdb.d
+  #     - clickhouse_data:/var/lib/clickhouse
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
+
+  # --- dashboard service goes here (Lorena) ---
+
+volumes:
+  postgres_data:
+  # clickhouse_data:
