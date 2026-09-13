@@ -32,6 +32,9 @@ x-flow-worker-env: &flow-worker-env
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
   AWS_REGION: ${AWS_REGION:-}
   AWS_ENDPOINT: ${AWS_ENDPOINT:-}
+  # Propagate Postgres nullability (e.g. payments.paid_at) instead of writing
+  # zero values like 1970-01-01. Only applies to mirrors created after it's set.
+  PEERDB_NULLABLE: "true"
 
 services:
   postgres:
@@ -166,7 +169,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *catalog-config
-      PEERDB_PASSWORD: ""
+      PEERDB_PASSWORD: peerdb
       PEERDB_FLOW_SERVER_ADDRESS: grpc://peerdb-flow-api:8112
       RUST_LOG: info
       RUST_BACKTRACE: "1"
@@ -176,7 +179,8 @@ services:
       peerdb-catalog:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9900/api/v1/health"]
+      # 9900 speaks the Postgres wire protocol, so probe it with pg_isready
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "9900"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -200,7 +204,7 @@ services:
 
   peerdb-minio:
     container_name: peerdb-minio
-    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     restart: unless-stopped
     volumes:
       - peerdb_minio_data:/data
@@ -239,7 +243,8 @@ services:
         condition: service_healthy
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    # pinned: PeerDB's ClickHouse connector and clickhouse/init/01_schema.sql were verified on this version
+    image: clickhouse/clickhouse-server:26.8.3.105
     env_file: .env
     ports:
       - "8123:8123"
@@ -248,10 +253,15 @@ services:
       - ./clickhouse/init:/docker-entrypoint-initdb.d
       - clickhouse_data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      # healthy only once clickhouse/init/01_schema.sql has created all 6 tables, so
+      # peerdb-init never races the schema and PeerDB always reuses our table definitions
+      test: ["CMD-SHELL", "clickhouse-client -u \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" -q \"SELECT throwIf(count() < 6) FROM system.tables WHERE database = 'ecommerce' AND name IN ('categories', 'products', 'customers', 'orders', 'order_items', 'payments')\""]
       interval: 5s
       timeout: 5s
       retries: 10
+      # first boot runs the init scripts on a temporary server before the real one starts;
+      # don't count failures during that window on slower machines
+      start_period: 60s
 
   # --- dashboard service goes here (Lorena) ---
 

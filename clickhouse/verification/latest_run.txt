@@ -1,0 +1,109 @@
+Run at: 2026-09-13 19:45:57 UTC
+
+==================================================================
+ 1. UPDATE in Postgres -> SELECT ... FINAL in ClickHouse
+==================================================================
+--- BEFORE
+
+$ psql: SELECT customer_id, email, city, updated_at FROM customers WHERE customer_id = 1
+ customer_id |        email        |   city    |          updated_at           
+-------------+---------------------+-----------+-------------------------------
+           1 | vnewman@example.net | Yorkmouth | 2026-09-13 19:44:46.486086+00
+(1 row)
+
+
+$ clickhouse: SELECT ... FROM customers FINAL WHERE customer_id = 1
+   ┌─customer_id─┬─email───────────────┬─city──────┬─────────────────updated_at─┬─_peerdb_version─┬─_peerdb_is_deleted─┐
+1. │           1 │ vnewman@example.net │ Yorkmouth │ 2026-09-13 19:44:46.486086 │               0 │                  0 │
+   └─────────────┴─────────────────────┴───────────┴────────────────────────────┴─────────────────┴────────────────────┘
+--- UPDATE
+
+$ psql: UPDATE customers SET email = 'cdc-verify-1789328758@example.com', updated_at = now() WHERE customer_id = 1
+ customer_id |               email               |          updated_at           
+-------------+-----------------------------------+-------------------------------
+           1 | cdc-verify-1789328758@example.com | 2026-09-13 19:45:58.546321+00
+(1 row)
+
+UPDATE 1
+-> replicated to ClickHouse after ~2s
+--- AFTER
+
+$ clickhouse (no FINAL): every stored version of the row, until a background merge collapses them
+   ┌─customer_id─┬─email─────────────────────────────┬─city──────┬─────────────────updated_at─┬─────_peerdb_version─┬─_peerdb_is_deleted─┐
+1. │           1 │ vnewman@example.net               │ Yorkmouth │ 2026-09-13 19:44:46.486086 │                   0 │                  0 │
+2. │           1 │ cdc-verify-1789328758@example.com │ Yorkmouth │ 2026-09-13 19:45:58.546321 │ 1789328758549198892 │                  0 │
+   └─────────────┴───────────────────────────────────┴───────────┴────────────────────────────┴─────────────────────┴────────────────────┘
+
+$ clickhouse (FINAL): only the latest version
+   ┌─customer_id─┬─email─────────────────────────────┬─city──────┬─────────────────updated_at─┬─────_peerdb_version─┬─_peerdb_is_deleted─┐
+1. │           1 │ cdc-verify-1789328758@example.com │ Yorkmouth │ 2026-09-13 19:45:58.546321 │ 1789328758549198892 │                  0 │
+   └─────────────┴───────────────────────────────────┴───────────┴────────────────────────────┴─────────────────────┴────────────────────┘
+
+==================================================================
+ 2. DELETE in Postgres -> soft delete (_peerdb_is_deleted = 1)
+==================================================================
+--- BEFORE
+
+$ clickhouse: SELECT ... FROM payments FINAL WHERE payment_id = 1
+   ┌─payment_id─┬─order_id─┬─payment_status─┬──amount─┬─────────────────updated_at─┬─_peerdb_version─┬─_peerdb_is_deleted─┐
+1. │          1 │        1 │ refunded       │ 3147.54 │ 2026-09-13 19:44:46.777583 │               0 │                  0 │
+   └────────────┴──────────┴────────────────┴─────────┴────────────────────────────┴─────────────────┴────────────────────┘
+--- DELETE
+
+$ psql: DELETE FROM payments WHERE payment_id = 1
+ payment_id | payment_status 
+------------+----------------
+          1 | refunded
+(1 row)
+
+DELETE 1
+-> replicated to ClickHouse after ~11s
+--- AFTER
+
+$ clickhouse (FINAL): the latest version is the delete marker; non-key columns are not sent by Postgres on DELETE
+   ┌─payment_id─┬─order_id─┬─payment_status─┬─amount─┬─────────────────updated_at─┬─────_peerdb_version─┬─_peerdb_is_deleted─┐
+1. │          1 │        0 │                │      0 │ 1970-01-01 00:00:00.000000 │ 1789328761271944950 │                  1 │
+   └────────────┴──────────┴────────────────┴────────┴────────────────────────────┴─────────────────────┴────────────────────┘
+
+$ clickhouse (FINAL + filter): the row is gone for analytical queries
+   ┌─rows_visible─┐
+1. │            0 │
+   └──────────────┘
+
+==================================================================
+ 3. UPDATEs made by the generator -> same final state in ClickHouse
+==================================================================
+
+$ psql: last orders the generator moved to a terminal status
+ order_id | order_status |          order_date           |          updated_at           
+----------+--------------+-------------------------------+-------------------------------
+       51 | delivered    | 2026-09-13 19:44:52.138888+00 | 2026-09-13 19:45:41.282187+00
+      196 | cancelled    | 2026-09-13 19:45:12.505676+00 | 2026-09-13 19:45:40.019499+00
+      198 | cancelled    | 2026-09-13 19:45:12.89282+00  | 2026-09-13 19:45:42.214954+00
+      220 | cancelled    | 2026-09-13 19:45:15.682924+00 | 2026-09-13 19:45:40.579254+00
+      390 | cancelled    | 2026-09-13 19:45:38.887883+00 | 2026-09-13 19:45:40.185434+00
+(5 rows)
+
+
+$ clickhouse (FINAL): same orders
+   ┌─order_id─┬─order_status─┬─────────────────order_date─┬─────────────────updated_at─┬─_peerdb_is_deleted─┐
+1. │       51 │ delivered    │ 2026-09-13 19:44:52.138888 │ 2026-09-13 19:45:41.282187 │                  0 │
+2. │      196 │ cancelled    │ 2026-09-13 19:45:12.505676 │ 2026-09-13 19:45:40.019499 │                  0 │
+3. │      198 │ cancelled    │ 2026-09-13 19:45:12.892820 │ 2026-09-13 19:45:42.214954 │                  0 │
+4. │      220 │ cancelled    │ 2026-09-13 19:45:15.682924 │ 2026-09-13 19:45:40.579254 │                  0 │
+5. │      390 │ cancelled    │ 2026-09-13 19:45:38.887883 │ 2026-09-13 19:45:40.185434 │                  0 │
+   └──────────┴──────────────┴────────────────────────────┴────────────────────────────┴────────────────────┘
+-> MATCH: order_status is identical in Postgres and ClickHouse FINAL
+
+==================================================================
+ 4. Row counts: Postgres vs ClickHouse (raw vs FINAL)
+==================================================================
+The generator keeps writing, so live tables can differ by the rows still in flight.
+
+table          postgres clickhouse_raw clickhouse_final
+categories            8              8                8
+products            200            214              200
+customers           500            517              500
+orders              629            689              603
+order_items        1873           1841             1780
+payments            610            671              581
