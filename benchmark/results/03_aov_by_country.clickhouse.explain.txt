@@ -1,0 +1,54 @@
+Output: ifNull(country, 'Unknown'), count(), CAST(round(avg(CAST(sum(quantity * unit_price) AS Decimal(20, 2))), 2) AS Decimal(20, 2))
+
+Sorting (Sorting for ORDER BY)
+│  Sort description: CAST(round(avg(CAST(sum(quantity * unit_price) AS Decimal(20, 2))), 2) AS Decimal(20, 2)) DESC, ifNull(country, 'Unknown') ASC
+└──Aggregating
+   │  Keys: ifNull(country, 'Unknown')
+   │  Aggregates: count(), avg(CAST(sum(quantity * unit_price) AS Decimal(20, 2)))
+   │  Skip merging: 0
+   └──Aggregating
+      │  Keys: order_id, ifNull(country, 'Unknown')
+      │  Aggregates: sum(quantity * unit_price)
+      │  Skip merging: 0
+      └──Join (JOIN FillRightFirst)
+         │  oi[92723] ⋈ (o[5502] ⋈ c[cache~500])
+         │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+         │  Result rows: 16509
+         │  Join conditions: order_id = order_id
+         │  Output:
+         │    Left:  quantity, unit_price
+         │    Right: order_id, country
+         ├──Filter
+         │  │  Filter column: _peerdb_is_deleted = 0 AND RF2(order_id, order_id)
+         │  └──ReadFromMergeTree (ecommerce.order_items)
+         │        Read type: Default
+         │        FINAL: 1
+         │        Parts: 3 | Granules: 14
+         │        Output: quantity, unit_price, order_id, _peerdb_is_deleted
+         └──BuildRuntimeFilter (Build runtime join filter on order_id)
+            │  Filter id: RF2
+            └──Join (JOIN FillRightFirst)
+               │  o[5502] ⋈ c[cache~500]
+               │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+               │  Result rows: 5648
+               │  Join conditions: customer_id = customer_id
+               │  Output:
+               │    Left:  order_id
+               │    Right: country
+               ├──Filter
+               │  │  Filter column: order_date < '2026-09-14 06:45:53.000000' AND updated_at < '2026-09-14 06:45:53.000000' AND order_status = 'delivered' AND _peerdb_is_deleted = 0 AND RF1(customer_id, customer_id from ecommerce.customers)
+               │  └──ReadFromMergeTree (ecommerce.orders)
+               │        Read type: Default
+               │        FINAL: 1
+               │        Parts: 2 | Granules: 5
+               │        Output: customer_id, order_id, order_date, updated_at, order_status, _peerdb_is_deleted
+               └──BuildRuntimeFilter (Build runtime join filter on customer_id)
+                  │  Filter id: RF1
+                  │  Source table: ecommerce.customers
+                  └──Filter ((WHERE + Change column names to column identifiers))
+                     │  Filter column: _peerdb_is_deleted = 0
+                     └──ReadFromMergeTree (ecommerce.customers)
+                           Read type: Default
+                           FINAL: 1
+                           Parts: 2 | Granules: 2
+                           Output: ifNull(country, 'Unknown'), customer_id, _peerdb_is_deleted

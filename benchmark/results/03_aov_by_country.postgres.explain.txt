@@ -1,0 +1,41 @@
+Sort  (cost=2352.81..2353.31 rows=200 width=60) (actual time=26.183..26.199 rows=198 loops=1)
+  Sort Key: ((round(avg(((sum(((oi.quantity)::numeric * oi.unit_price)))::numeric(20,2))), 2))::numeric(20,2)) DESC, (COALESCE(c.country, 'Unknown'::character varying))
+  Sort Method: quicksort  Memory: 35kB
+  Buffers: shared hit=920
+  ->  HashAggregate  (cost=2341.67..2345.17 rows=200 width=60) (actual time=25.932..26.053 rows=198 loops=1)
+        Group Key: (COALESCE(c.country, 'Unknown'::character varying))
+        Batches: 1  Memory Usage: 160kB
+        Buffers: shared hit=914
+        ->  HashAggregate  (cost=2238.87..2286.32 rows=3163 width=56) (actual time=24.897..25.441 rows=1288 loops=1)
+              Group Key: o.order_id, COALESCE(c.country, 'Unknown'::character varying)
+              Batches: 1  Memory Usage: 625kB
+              Buffers: shared hit=914
+              ->  Hash Join  (cost=332.43..2199.33 rows=3163 width=46) (actual time=1.957..21.969 rows=3818 loops=1)
+                    Hash Cond: (o.customer_id = c.customer_id)
+                    Buffers: shared hit=914
+                    ->  Hash Join  (cost=313.18..2171.71 rows=3163 width=18) (actual time=1.688..20.835 rows=3818 loops=1)
+                          Hash Cond: (oi.order_id = o.order_id)
+                          Buffers: shared hit=906
+                          ->  Seq Scan on order_items oi  (cost=0.00..1614.92 rows=92792 width=14) (actual time=0.003..8.776 rows=92738 loops=1)
+                                Buffers: shared hit=687
+                          ->  Hash  (cost=299.73..299.73 rows=1076 width=8) (actual time=1.646..1.648 rows=1294 loops=1)
+                                Buckets: 2048  Batches: 1  Memory Usage: 67kB
+                                Buffers: shared hit=219
+                                ->  Bitmap Heap Scan on orders o  (cost=24.31..299.73 rows=1076 width=8) (actual time=0.171..1.379 rows=1294 loops=1)
+                                      Recheck Cond: ((order_status)::text = 'delivered'::text)
+                                      Filter: ((order_date < '2026-09-14 06:45:53+00'::timestamp with time zone) AND (updated_at < '2026-09-14 06:45:53+00'::timestamp with time zone))
+                                      Rows Removed by Filter: 271
+                                      Heap Blocks: exact=215
+                                      Buffers: shared hit=219
+                                      ->  Bitmap Index Scan on idx_orders_status  (cost=0.00..24.04 rows=1567 width=0) (actual time=0.119..0.119 rows=1565 loops=1)
+                                            Index Cond: ((order_status)::text = 'delivered'::text)
+                                            Buffers: shared hit=4
+                    ->  Hash  (cost=13.00..13.00 rows=500 width=15) (actual time=0.243..0.243 rows=500 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 32kB
+                          Buffers: shared hit=8
+                          ->  Seq Scan on customers c  (cost=0.00..13.00 rows=500 width=15) (actual time=0.009..0.090 rows=500 loops=1)
+                                Buffers: shared hit=8
+Planning:
+  Buffers: shared hit=291
+Planning Time: 1.616 ms
+Execution Time: 26.645 ms

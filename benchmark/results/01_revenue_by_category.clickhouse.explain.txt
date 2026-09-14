@@ -1,0 +1,65 @@
+Output: toDate(toStartOfMonth(order_date)), category_name, CAST(sum(quantity * unit_price) AS Decimal(20, 2))
+
+Sorting (Sorting for ORDER BY)
+│  Sort description: toDate(toStartOfMonth(order_date)) ASC, CAST(sum(quantity * unit_price) AS Decimal(20, 2)) DESC, category_name ASC
+└──Aggregating
+   │  Keys: toDate(toStartOfMonth(order_date)), category_name
+   │  Aggregates: sum(quantity * unit_price)
+   │  Skip merging: 0
+   └──Join (JOIN FillRightFirst)
+      │  oi[92149] ⋈ o[cache~1294] ⋈ (p[200] ⋈ c[8])
+      │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+      │  Result rows: 3793
+      │  Join conditions: product_id = product_id
+      │  Output:
+      │    Left:  order_date, quantity, unit_price
+      │    Right: category_name
+      ├──Join (JOIN FillRightFirst)
+      │  │  oi[92149] ⋈ o[cache~1294]
+      │  │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+      │  │  Result rows: 3775
+      │  │  Join conditions: order_id = order_id
+      │  │  Output:
+      │  │    Left:  quantity, unit_price, product_id
+      │  │    Right: order_date
+      │  ├──Filter
+      │  │  │  Filter column: _peerdb_is_deleted = 0 AND RF2(order_id, order_id from ecommerce.orders) AND RF1(product_id, product_id)
+      │  │  └──ReadFromMergeTree (ecommerce.order_items)
+      │  │        Read type: Default
+      │  │        FINAL: 1
+      │  │        Parts: 2 | Granules: 13
+      │  │        Output: quantity, unit_price, order_id, product_id, _peerdb_is_deleted
+      │  └──BuildRuntimeFilter (Build runtime join filter on order_id)
+      │     │  Filter id: RF2
+      │     │  Source table: ecommerce.orders
+      │     └──Filter ((WHERE + Change column names to column identifiers))
+      │        │  Filter column: order_date < '2026-09-14 06:45:53.000000' AND updated_at < '2026-09-14 06:45:53.000000' AND order_status = 'delivered' AND _peerdb_is_deleted = 0
+      │        └──ReadFromMergeTree (ecommerce.orders)
+      │              Read type: Default
+      │              FINAL: 1
+      │              Parts: 1 | Granules: 4
+      │              Output: order_date, order_id, updated_at, order_status, _peerdb_is_deleted
+      └──BuildRuntimeFilter (Build runtime join filter on product_id)
+         │  Filter id: RF1
+         └──Join (JOIN FillRightFirst)
+            │  p[200] ⋈ c[8]
+            │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+            │  Result rows: 200
+            │  Join conditions: category_id = category_id
+            │  Output:
+            │    Left:  product_id
+            │    Right: category_name
+            ├──Filter ((WHERE + Change column names to column identifiers))
+            │  │  Filter column: _peerdb_is_deleted = 0
+            │  └──ReadFromMergeTree (ecommerce.products)
+            │        Read type: Default
+            │        FINAL: 1
+            │        Parts: 1 | Granules: 1
+            │        Output: product_id, category_id, _peerdb_is_deleted
+            └──Filter ((WHERE + Change column names to column identifiers))
+               │  Filter column: _peerdb_is_deleted = 0
+               └──ReadFromMergeTree (ecommerce.categories)
+                     Read type: Default
+                     FINAL: 1
+                     Parts: 1 | Granules: 1
+                     Output: category_name, category_id, _peerdb_is_deleted

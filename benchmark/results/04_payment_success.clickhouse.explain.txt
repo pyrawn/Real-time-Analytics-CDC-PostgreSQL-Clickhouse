@@ -1,0 +1,33 @@
+Output: payment_method, count(), countIf(payment_status = 'completed'), countIf(payment_status = 'failed'), countIf(payment_status = 'refunded'), CAST(round(100. * countIf(payment_status = 'completed') / nullIf(count(), 0), 2) AS Decimal(10, 2))
+
+Sorting (Sorting for ORDER BY)
+│  Sort description: CAST(round(100. * countIf(payment_status = 'completed') / nullIf(count(), 0), 2) AS Decimal(10, 2)) DESC, payment_method ASC
+└──Aggregating
+   │  Keys: payment_method
+   │  Aggregates: count(), countIf(payment_status = 'completed'), countIf(payment_status = 'failed'), countIf(payment_status = 'refunded')
+   │  Skip merging: 0
+   └──Join (JOIN FillRightFirst)
+      │  p[12050] ⋈ o[cache~1294]
+      │  Type: inner | Strictness: all | Algorithm: SpillingHashJoin(HashJoin)
+      │  Result rows: 1294
+      │  Join conditions: order_id = order_id
+      │  Output:
+      │    Left:  payment_method, payment_status
+      │    Right: Empty
+      ├──Filter
+      │  │  Filter column: payment_status IN ('completed', 'refunded') AND updated_at < '2026-09-14 06:45:53.000000' AND _peerdb_is_deleted = 0 AND RF1(order_id, order_id from ecommerce.orders)
+      │  └──ReadFromMergeTree (ecommerce.payments)
+      │        Read type: Default
+      │        FINAL: 1
+      │        Parts: 2 | Granules: 5
+      │        Output: payment_method, payment_status, order_id, updated_at, _peerdb_is_deleted
+      └──BuildRuntimeFilter (Build runtime join filter on order_id)
+         │  Filter id: RF1
+         │  Source table: ecommerce.orders
+         └──Filter ((WHERE + Change column names to column identifiers))
+            │  Filter column: order_status = 'delivered' AND order_date < '2026-09-14 06:45:53.000000' AND updated_at < '2026-09-14 06:45:53.000000' AND _peerdb_is_deleted = 0
+            └──ReadFromMergeTree (ecommerce.orders)
+                  Read type: Default
+                  FINAL: 1
+                  Parts: 2 | Granules: 5
+                  Output: order_id, order_status, order_date, updated_at, _peerdb_is_deleted

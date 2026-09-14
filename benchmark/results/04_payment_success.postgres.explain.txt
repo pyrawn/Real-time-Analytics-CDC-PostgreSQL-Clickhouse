@@ -1,0 +1,34 @@
+Sort  (cost=1086.61..1086.62 rows=4 width=56) (actual time=8.792..8.796 rows=4 loops=1)
+  Sort Key: ((round(((100.0 * (count(*) FILTER (WHERE ((p.payment_status)::text = 'completed'::text)))::numeric) / (NULLIF(count(*), 0))::numeric), 2))::numeric(10,2)) DESC, p.payment_method
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=510
+  ->  GroupAggregate  (cost=1080.84..1086.57 rows=4 width=56) (actual time=8.593..8.745 rows=4 loops=1)
+        Group Key: p.payment_method
+        Buffers: shared hit=504
+        ->  Sort  (cost=1080.84..1081.46 rows=250 width=16) (actual time=8.520..8.567 rows=755 loops=1)
+              Sort Key: p.payment_method
+              Sort Method: quicksort  Memory: 58kB
+              Buffers: shared hit=504
+              ->  Hash Join  (cost=314.38..1070.88 rows=250 width=16) (actual time=1.572..8.198 rows=755 loops=1)
+                    Hash Cond: (p.order_id = o.order_id)
+                    Buffers: shared hit=504
+                    ->  Seq Scan on payments p  (cost=0.00..737.25 rows=7330 width=20) (actual time=0.009..5.657 rows=7457 loops=1)
+                          Filter: (((payment_status)::text = ANY ('{completed,refunded}'::text[])) AND (updated_at < '2026-09-14 06:45:53+00'::timestamp with time zone))
+                          Rows Removed by Filter: 22679
+                          Buffers: shared hit=284
+                    ->  Hash  (cost=300.88..300.88 rows=1080 width=4) (actual time=1.527..1.528 rows=1294 loops=1)
+                          Buckets: 2048  Batches: 1  Memory Usage: 62kB
+                          Buffers: shared hit=220
+                          ->  Bitmap Heap Scan on orders o  (cost=24.36..300.88 rows=1080 width=4) (actual time=0.164..1.310 rows=1294 loops=1)
+                                Recheck Cond: ((order_status)::text = 'delivered'::text)
+                                Filter: ((order_date < '2026-09-14 06:45:53+00'::timestamp with time zone) AND (updated_at < '2026-09-14 06:45:53+00'::timestamp with time zone))
+                                Rows Removed by Filter: 279
+                                Heap Blocks: exact=216
+                                Buffers: shared hit=220
+                                ->  Bitmap Index Scan on idx_orders_status  (cost=0.00..24.09 rows=1573 width=0) (actual time=0.115..0.115 rows=1573 loops=1)
+                                      Index Cond: ((order_status)::text = 'delivered'::text)
+                                      Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=310
+Planning Time: 1.213 ms
+Execution Time: 8.899 ms
