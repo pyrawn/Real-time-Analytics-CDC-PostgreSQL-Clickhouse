@@ -1,0 +1,18 @@
+{
+  "run_at_utc": "2026-09-14T06:51:11.890849+00:00",
+  "cutoff": "2026-09-14 06:45:53+00",
+  "repetitions": 5,
+  "git_commit": "23651dee8113223e20989a0b9eb034fbef54437c",
+  "environment": {
+    "POSTGRES_DB": "ecommerce",
+    "CLICKHOUSE_DB": "ecommerce",
+    "GEN_RATE_PER_SEC": "100",
+    "GEN_DURATION_SECONDS": "0"
+  },
+  "query_row_counts": {
+    "01_revenue_by_category": 8,
+    "02_top_products": 10,
+    "03_aov_by_country": 198,
+    "04_payment_success": 4
+  }
+}
