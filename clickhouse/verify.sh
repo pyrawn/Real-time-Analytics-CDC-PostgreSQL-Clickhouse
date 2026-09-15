@@ -11,7 +11,8 @@
 # The output is also saved to clickhouse/verification/latest_run.txt for the report.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+# tr strips CR in case .env was saved with Windows line endings
+set -a; eval "$(tr -d '\r' < .env)"; set +a
 
 OUT=clickhouse/verification/latest_run.txt
 mkdir -p "$(dirname "$OUT")"

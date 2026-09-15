@@ -141,6 +141,7 @@ def op_create_order(conn, stats):
             (random.randint(1, 5),),
         )
         items = cur.fetchall()
+        total = 0
         for product_id, price in items:
             quantity = random.randint(1, 4)
             cur.execute(
@@ -149,8 +150,8 @@ def op_create_order(conn, stats):
                 (order_id, product_id, quantity, price),
             )
             stats["insert"] += 1
+            total += price * quantity
 
-        total = sum(price * random.randint(1, 4) for _, price in items)
         cur.execute(
             "INSERT INTO payments (order_id, payment_method, amount, payment_status) "
             "VALUES (%s, %s, %s, 'pending')",

@@ -1,0 +1,6 @@
+# Scripts and configs run inside Linux containers: always check them out with LF,
+# even on Windows (core.autocrlf=true would otherwise turn them into CRLF).
+* text=auto eol=lf
+*.pdf binary
+*.crt binary
+*.key binary
