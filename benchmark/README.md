@@ -15,10 +15,10 @@ docker compose logs --tail 20 generator
 ```
 
 Wait until PeerDB is replicating and the generator is active. The assignment target
-is approximately 200,000 INSERT/UPDATE/DELETE operations across the run. At the
-default rate, let the generator continue until its logs reach that total, or raise
-`GEN_RATE_PER_SEC`/`GEN_DURATION_SECONDS` in the ignored `.env` and record the
-values used.
+is approximately 200,000 INSERT/UPDATE/DELETE operations across the run. The
+`.env.example` values (`GEN_RATE_PER_SEC=100`, `GEN_DURATION_SECONDS=0`) reach that
+in about half an hour and keep the generator running; check `total_ops` in the
+generator logs. If you change them in the ignored `.env`, record the values used.
 
 Do not stop the generator during the benchmark.
 
@@ -66,13 +66,14 @@ The runner writes these generated files to `benchmark/results/`:
 ... one plan pair for each query
 timings.csv
 run_metadata.json
-summary.md
-workload.md
+summary_generated.md
 ```
 
-`summary.md` is the starting point for the final report: add observations from the
-captured plans, including row-store/index behavior in PostgreSQL, columnar execution
-in ClickHouse, and the cost of `FINAL`.
+`summary_generated.md` is only a draft with the timing table. The analysis for the
+final report lives in the hand-written `summary.md` (plus `workload.md`), which the
+runner never overwrites: after a new run, update it with the new timings and with
+observations from the captured plans, including row-store/index behavior in
+PostgreSQL, columnar execution in ClickHouse, and the cost of `FINAL`.
 
 If CPU/memory observations are required, capture them as workload-level snapshots:
 
