@@ -264,6 +264,14 @@ services:
       start_period: 60s
 
   # --- dashboard service goes here (Lorena) ---
+  dashboard:
+    build: ./dashboard
+    env_file: .env
+    ports:
+      - "8501:8501"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
 
 volumes:
   postgres_data:
