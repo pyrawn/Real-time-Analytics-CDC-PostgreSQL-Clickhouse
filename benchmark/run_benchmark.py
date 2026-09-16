@@ -277,7 +277,8 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(timings)
 
-    (RESULTS_DIR / "summary.md").write_text(summary_markdown(cutoff, summaries))
+    # summary.md is the hand-written analysis; never overwrite it with the generated draft
+    (RESULTS_DIR / "summary_generated.md").write_text(summary_markdown(cutoff, summaries))
     metadata = {
         "run_at_utc": datetime.now(timezone.utc).isoformat(),
         "cutoff": cutoff,

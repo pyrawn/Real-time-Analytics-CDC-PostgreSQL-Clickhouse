@@ -119,7 +119,8 @@ services:
       - TEMPORAL_CLI_ADDRESS=peerdb-temporal:7233
       - TEMPORAL_CLI_SHOW_STACKS=1
     image: temporalio/admin-tools:1.25.2-tctl-1.18.1-cli-1.1.1@sha256:da0c7a7982b571857173ab8f058e7f139b3054800abb4dcb100445d29a563ee8
-    entrypoint: /etc/temporal/entrypoint.sh
+    # run through sh so the bind-mounted script doesn't need the exec bit (lost on some checkouts)
+    entrypoint: ["sh", "/etc/temporal/entrypoint.sh"]
     healthcheck:
       test: ["CMD", "tctl", "workflow", "list"]
       interval: 1s
